@@ -1,7 +1,7 @@
 # %% [markdown]
 # **O QUE ESSE CÓDIGO FAZ?**
 # 
-# Dando seguimento ao código do ETL 1 da RAIS estabelecimentos, que faz o download, tratamento e importa os dados para o mongodb e para o postgresql no Dbeaver, esse código lê o dicionário que construímos da tabela (01_doc\dicionario_rais_estab_sebrae.xlsx) e importa as abas de dimensão pro MongoDB e para o PostgreSQL no Dbeaver.
+# Esse código lê o dicionário que construímos da tabela (01_doc\dicionario_rais_vinc_sebrae.xlsx) e importa as abas de dimensão pro MongoDB e para o PostgreSQL no Dbeaver.
 # 
 # OBS: o código só precisará ser rodado novamente se houver mudança no layout da tabela (ex: acréscimo de colunas/categorias). 
 
@@ -9,23 +9,19 @@
 # # **1. IMPORTANDO LIBS** 
 
 # %%
+from datetime import datetime
 from datetime import date
 import json
 import pandas as pd
-import pymongo as p
 import psycopg2
-#from psycopg2 import sql
-#import requests
-import urllib
+import pymongo as p
+
 
 # %% [markdown]
-# # **2. EXECUTANDO** 
-
-# %% [markdown]
-# ## **2.1 CRIANDO FUNÇÕES** 
+# # **2. CRIANDO FUNÇÕES** 
 
 # %%
-def load_config(file_path=r'..\..\config.json'):
+def load_config(file_path=r'..\config.json'):
     with open(file_path, 'r') as file:
         config = json.load(file)
     return config
@@ -34,18 +30,13 @@ def load_config(file_path=r'..\..\config.json'):
 # Função para fazer upload no mongodb seguindo o padrão das demais funções do tipo que já utilizamos
 
 def upload_mongodb(df, arquivo):
-    
-    print("------- Conectando com o mongodb ------------------")     
 
     config = load_config()
-
-    host = config["mongodb"]["host"]
-    port = config["mongodb"]["port"]
-    user_name = config["mongodb"]["user_name"]
-    password = config["mongodb"]["password"]
-    db_name = config["mongodb"]["db_name"]
     
-    client = p.MongoClient(f"mongodb://{user_name}:{urllib.parse.quote_plus(password)}@{host}:{port}/{db_name}")
+    print("------- Conectando com o mongodb ------------------")     
+    
+
+    client = p.MongoClient(f"f"mongodb://{config['mongodb']['user_name']}:{config['mongodb']['password']}@{config['mongodb']['host']}:{config['mongodb']['port']}/{config['mongodb']['db_name']}")
     db = client.SEBRAE
     type(client)
 
@@ -67,14 +58,14 @@ def transfer_to_postgres(data, collection_name):
     print("------- Conectando com o PostgreSQL ------------------")     
 
     config = load_config()
-    
+
     # Conectando ao PostgreSQL
     conn = psycopg2.connect(
-        host=config["pg_host"],
-        port=config["pg_port"],
-        dbname=config["pg_db_name"],
-        user=config["pg_user"],
-        password=config["postgresql"]["pg_password"]
+        host=config['postgresql']['pg_host'],
+        port=config['postgresql']['pg_port'],
+        dbname=config['postgresql']['pg_db_name'],
+        user=config['postgresql']['pg_user'],
+        password=config['postgresql']['pg_password']
     )
 
     # Criando um cursor
@@ -94,7 +85,8 @@ def transfer_to_postgres(data, collection_name):
         # Determinando o tipo de cada coluna
         column_types = []
         for column in columns:
-            max_length = max(len(str(record[column])) for record in data)
+            unique_values = set(record[column] for record in data)
+            max_length = max(len(str(value)) for value in unique_values)
             if isinstance(data[0][column], int):
                 if max(record[column] for record in data) < 32767:  # smallint range
                     column_types.append(f"{column} smallint")
@@ -127,18 +119,24 @@ def transfer_to_postgres(data, collection_name):
 
 
 # %% [markdown]
-# ## **2.2 DEFININDO CAMINHO DA PLANILHA DO DICIONÁRIO, LENDO ELA E IMPRIMINDO LISTA COM AS ABAS EXISTENTES** 
+# # **3. EXECUTANDO**
+
+# %% [markdown]
+# ## **3.1 DEFININDO CAMINHO DA PLANILHA DO DICIONÁRIO, LENDO ELA E IMPRIMINDO LISTA COM AS ABAS EXISTENTES** 
 
 # %%
 # Definindo caminho e imprimindo uma lista com todas as sheets da planilha
 ds_owner = input('Insira seu nome e sobrenome (Ex: Marcilio Duarte)')
 path = input('Insira o caminho do arquivo excel onde estão as dimensões/tabelas (dicionário): ')
 xls = pd.ExcelFile(path)
-sheets = xls.sheet_names[1:-1]
+
+
+# %%
+sheets = xls.sheet_names[1:-17]
 print(sheets)
 
 # %% [markdown]
-# ## **2.3 RODANDO** 
+# ## **3.2 RODANDO** 
 
 # %%
 for i in sheets:
@@ -147,7 +145,7 @@ for i in sheets:
     df['ds_owner'] = ds_owner
     for col in df.columns:
         df[col] = df[col].apply(lambda x: x.strip() if isinstance(x, str) else x)
-    coll_name = str.upper('tb_rais_estab'+i[2:])
+    coll_name = str.upper('tb_rais_vinc'+i[2:])
     upload_mongodb(df=df, arquivo=coll_name)
     # Suponha que df seja o seu DataFrame
     df = df.to_dict('records')

@@ -1,0 +1,8 @@
+pandas==2.2.2
+py7zr==0.22.0
+pyspark==3.3.1
+pymongo==4.7.1
+requests==2.32.3
+SQLAlchemy==2.0.29
+urllib3==2.3.0
+dnspython==2.6.1
